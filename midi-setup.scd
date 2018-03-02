@@ -23,7 +23,7 @@ m = r.initMIDI("Midi Through", "Midi Through Port-0")
 TinySnippets.enable("y", z)
 ;
 Task({
-  var ac, jc, snip;
+  var cfg = ();
   // setup repetition midi stuff
   r.midiEventTypes;
   // setup fluidsynth
@@ -60,20 +60,22 @@ Task({
   4.wait
   ;
   // setup aconnect
-  ac = Aconnect();
-  ac.connect(ac.outByName("fluid synth").port, ac.inByName("midi through").port)
+  cfg.ac = Aconnect();
+  cfg.fluid = cfg.ac.outByName("fluid synth");
+  cfg.midithru = cfg.ac.inByName("midi through");
+  cfg.ac.connect(cfg.fluid.port, cfg.midithru.port)
   ;
   5.wait;
-  jc = JackConnect.new
+  cfg.jc = JackConnect.new
   ;
   // disconnect 'wrong' connections first.
   (1..4).collect {
     |i|
-    jc.disconnectClients("SuperCollider:out_%".format(i), "system:playback_%".format(i));
+    cfg.jc.disconnectClients("SuperCollider:out_%".format(i), "system:playback_%".format(i));
     if (i <= 2) {
-      ["l", "r"].collect{ |letter| jc.disconnectClients("fluidsynth:%_00".format(letter), "system:playback_%".format(i)); }
+      ["l", "r"].collect{ |letter| cfg.jc.disconnectClients("fluidsynth:%_00".format(letter), "system:playback_%".format(i)); }
     } {
-      ["l", "r"].collect{ |letter| jc.disconnectClients("fluidsynth:%_01".format(letter), "system:playback_%".format(i)); }
+      ["l", "r"].collect{ |letter| cfg.jc.disconnectClients("fluidsynth:%_01".format(letter), "system:playback_%".format(i)); }
     };
   }
   ;
@@ -81,12 +83,12 @@ Task({
   (0..15).collect {
     |i|
     var idx = i.asString.padLeft(2,"0");
-    jc.connectClients("fluidsynth:l_%".format(idx), "SuperCollider:in_%".format(i+1));
-    jc.connectClients("fluidsynth:r_%".format(idx), "SuperCollider:in_%".format(i+1));
+    cfg.jc.connectClients("fluidsynth:l_%".format(idx), "SuperCollider:in_%".format(i+1));
+    cfg.jc.connectClients("fluidsynth:r_%".format(idx), "SuperCollider:in_%".format(i+1));
   }
   ;
   // Connect SC:out to System:playback
-  (1..16).collect { |i| jc.connectClients("SuperCollider:out_%".format(i), "system:playback_%".format(((i-1)%2)+1)); }
+  (1..16).collect { |i| cfg.jc.connectClients("SuperCollider:out_%".format(i), "system:playback_%".format(((i-1)%2)+1)); }
   ;
   "-> BALC MIDI Loaded".postln;
 }).start;
