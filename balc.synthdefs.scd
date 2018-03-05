@@ -1,5 +1,10 @@
 (
-SynthDef(\in, { |out, in = 0, amp=0.9| OffsetOut.ar(out, SoundIn.ar(in)!2 * amp); }).add;
+SynthDef(\sample, {
+  |out = 0, buf = 0, rate = 1, amp = 0.5, pan = 0, pos = 0, sustain = 20|
+  var sample;
+  sample = PlayBuf.ar(2, buf, BufRateScale.ir(buf) * rate, 1, BufDur.kr(buf)*pos*44100, doneAction:2) * EnvGen.ar(Env.linen(0.01,sustain,0), doneAction:2);
+  OffsetOut.ar(out, Pan2.ar(sample * amp, pan));
+}).add;
 
 
 SynthDef(\fm, {
@@ -11,18 +16,6 @@ SynthDef(\fm, {
   car = SinOsc.ar(([freq, freq+detune] * carPartial) + mod,	0, mul);
   OffsetOut.ar(out, Limiter.ar(Pan2.ar(car * env, pan, amp), 0.9));
 }, metadata: (credit: "@munshkr")).add;
-
-SynthDef(\fmr, {
-  |out, amp=0.9, attack=0.001, sustain=1, accel, carPartial=1, modPartial=1, index=3, mul=0.25, detune=0.1, pan=0, freq, mix=0.33, room=0.5, crush=1, bits=24, wave=0|
-  var env, mod, car;
-  amp = amp * 0.9;
-  env = EnvGen.ar(Env.perc(attack, 0.999, 1, -3), timeScale: sustain / 2, doneAction:2);
-  mod = SinOsc.ar(freq * modPartial * Line.kr(1,1+accel, sustain), 0, freq * index * LFNoise1.kr(5.reciprocal).abs);
-  car = SinOsc.ar(([freq, freq+detune] * carPartial) + mod,	0, mul);
-  car = FreeVerb.ar(Mix.ar(car), mix, room);
-  car = Select.ar(wave, [car, Decimator.ar(car, 44100/crush, bits)]);
-  OffsetOut.ar(out, Limiter.ar(Pan2.ar(car * env, pan, amp), 0.9));
-}, metadata: (credit: "based on @munshkr's fm")).add;
 
 
 SynthDef(\fms, {
@@ -58,8 +51,8 @@ SynthDef(\sc303, {
   env = EnvGen.kr(Env.asr, gate, doneAction: 2);
   volEnv =  EnvGen .ar( Env .new([10e-10, 1, 1, 10e-10], [0.01, sustain, decay],  \exp ), gate);
   filEnv =  EnvGen .ar( Env .new([10e-10, 1, 10e-10], [0.01, decay],  \exp ), gate);
-  waves = [ Saw .ar(freq, volEnv),  Pulse .ar(freq, 0.5, volEnv)] * env;
-  sig = RLPF .ar(  Select .ar(wave, waves), lctf + (filEnv * hctf), rq).dup * amp;
+  waves = [Saw .ar(freq, volEnv),  Pulse .ar(freq, 0.5, volEnv) ] * env;
+  sig = RLPF .ar(Select.ar(wave, waves), lctf + (filEnv * hctf), rq) * amp;
   OffsetOut.ar(0, Pan2.ar(sig, pan, amp));
 }, metadata:(credit: "based on http://sccode.org/1-4Wy")).add;
 
@@ -111,6 +104,45 @@ SynthDef(\eric2, {
   sound = Mix.ar(BPF.ar(sound,DC.ar(Array.fill(5,{|i| i+1}))*freq, (4/1000))*DC.ar(Array.fill(5,{|i| 1.0/(i+1)})));
   OffsetOut.ar(out, Pan2.ar(sound, pan, amp) * envGen);
 }, metadata: (credit: "by @efairbanks")).add;
+
+// ted the trumpet
+
+SynthDef(\rh1,{|out=0 freq=261.6255653006 amp=0.1 gate=1 cutoff=1500 rq=0.5 pan=0.0|
+  var sig, filter, env, pulse1, pulse2, pulse3;
+  pulse1 = Pulse.ar(freq:freq*1.01, width:0.2, mul:0.7);
+  pulse2 = Mix(Pulse.ar(freq:freq*[1,33.5.midiratio], width:[0.2,0.1], mul:[0.7,0.5]));
+  pulse3 = Pulse.ar(freq:freq*0.99, width:0.2, mul:0.7);
+  sig = [pulse1, pulse2, pulse3];
+  sig = Splay.ar(sig, spread: 0.9, center:pan);
+  env = EnvGen.ar(Env.adsr(0.0,0.8,0.8,0.5),gate,doneAction:2);
+  sig = BLowPass4.ar(sig,(cutoff*(env.squared))+200+freq,rq);
+  sig = Compander.ar(3*sig,sig,0.5,1,4);
+  Out.ar(out, sig * env * amp * 0.4);
+}).add;
+SynthDef(\rh2, {
+  |
+  // standard meanings
+  out = 0, freq = 440, gate = 1, pan = 0, amp = 0.1,
+  // all of these range from 0 to 1
+  vel = 0.8, modIndex = 0.2, mix = 0.2, lfoSpeed = 0.4, lfoDepth = 0.1
+  |
+  var env1, env2, env3, env4;
+  var osc1, osc2, osc3, osc4, snd;
+  lfoSpeed = lfoSpeed * 12;
+  freq = freq * 2;
+  env1 = EnvGen.ar(Env.adsr(0.001, 1.25, 0.0, 0.04, curve: \lin));
+  env2 = EnvGen.ar(Env.adsr(0.001, 1.00, 0.0, 0.04, curve: \lin));
+  env3 = EnvGen.ar(Env.adsr(0.001, 1.50, 0.0, 0.04, curve: \lin), gate, doneAction: 2);
+  env4 = EnvGen.ar(Env.adsr(0.001, 1.50, 0.0, 0.04, curve: \lin));
+  osc4 = SinOsc.ar(freq * 0.5) * 2pi * 2 * 0.535887 * modIndex * env4 * vel;
+  osc3 = SinOsc.ar(freq, osc4) * env3 * vel;
+  osc2 = SinOsc.ar(freq * 15) * 2pi * 0.108819 * env2 * vel;
+  osc1 = SinOsc.ar(freq, osc2) * env1 * vel;
+  snd = Mix((osc3 * (1 - mix)) + (osc1 * mix));
+  snd = snd * (SinOsc.ar(lfoSpeed) * lfoDepth + 1);
+  snd = Pan2.ar(snd, pan, amp);
+  Out.ar(out, snd);
+}).add;
 
 // foxdot
 
